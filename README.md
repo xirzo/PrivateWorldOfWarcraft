@@ -9,13 +9,29 @@ It just clones [AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk
 
 After the build is done, you can use `transfer.sh` to move the *tarball*, *server directory*, and *install-wow-wotlk.sh* to the target machine. You must provide the target IP as an environment variable. 
 
-```bash
+```sh
 export TARGET_IP="192.168.1.100"
 export TARGET_PORT="22" # Optional, defaults to 22
 ./transfer.sh
 ```
 
-Once transferred, load the images, and run the installation script.
+Once transferred, load the images and initialize the containers
+
+```sh
+docker load < ~/wow-compiled-images.tar
+```
+
+```sh
+cd ~/wow-server-playerbots
+docker compose up --no-build --no-start
+```
+
+and run the installation script
+
+```sh
+cd ~/
+./install-wow-wotlk.sh
+```
 
 # Credits
 

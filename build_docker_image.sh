@@ -61,4 +61,4 @@ info "Compiling server images (this will take 2-4 hours)..."
 cd "$SERVER_DIR" || exit 1
 docker compose build
 
-docker save wow-server-playerbots-ac-worldserver wow-server-playerbots-ac-authserver wow-server-playerbots-ac-db-import wow-server-playerbots-ac-client-data-init > wow-compiled-images.tar
+docker save acore/ac-wotlk-worldserver:master acore/ac-wotlk-authserver:master acore/ac-wotlk-db-import:master acore/ac-wotlk-client-data:master > wow-compiled-images.tar
