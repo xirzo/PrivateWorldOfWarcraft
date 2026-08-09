@@ -18,7 +18,7 @@ export TARGET_PORT="22" # Optional, defaults to 22
 Once transferred, load the images and initialize the containers
 
 ```sh
-docker load < ~/wow-compiled-images.tar
+docker load < ~/wow-server-playerbots/wow-compiled-images.tar
 ```
 
 ```sh
