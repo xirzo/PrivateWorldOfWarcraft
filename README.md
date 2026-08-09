@@ -7,7 +7,15 @@ It just clones [AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk
 > [!WARNING]
 > You must use *docker's buildkit*, on *Arch Linux* just use `sudo pacman -S docker-buildx` command 
 
-After the build is done, transfer the *tarball* and *install-wow-wotlk.sh* to the steamdeck or server, load the images and run the installation script there.
+After the build is done, you can use `transfer.sh` to move the *tarball*, *server directory*, and *install-wow-wotlk.sh* to the target machine. You must provide the target IP as an environment variable. 
+
+```bash
+export TARGET_IP="192.168.1.100"
+export TARGET_PORT="22" # Optional, defaults to 22
+./transfer.sh
+```
+
+Once transferred, load the images, and run the installation script.
 
 # Credits
 
