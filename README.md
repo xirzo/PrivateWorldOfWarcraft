@@ -1,53 +1,46 @@
-# How To
+# Guided for clients
 
-This script is used to offload building the server to a better PC, as I don't wanna do what on a steamdeck.
+## Downloading client
 
-It just clones [AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk.git) and [mod-player-bots](https://github.com/mod-playerbots/mod-playerbots.git), then generates a `docker-compose.override.yml` file and triggers the build.
+Download client from [ChromieCraft](https://chromiecraft.com/en/downloads/),
+you may download it from somewhere else, just make sure it's clean. Then extract it
+somewhere.
 
-> [!WARNING]
-> You must use *docker's buildkit*, on *Arch Linux* just use `sudo pacman -S docker-buildx` command 
+## Installing russian locale
 
-After the build is done, you can use `transfer.sh` to move the *tarball*, *server directory*, and *install-wow-wotlk.sh* to the target machine. You must provide the target IP as an environment variable. 
+Install russian locale from [Google Drive](https://drive.google.com/drive/folders/1r9tMosDbh18qqRSa_qIyOdEk9RaFQhU5?usp=sharing) and extract it's contents to game root directory.
 
-```sh
-export TARGET_IP="192.168.1.100"
-export TARGET_PORT="22" # Optional, defaults to 22
-./transfer.sh
+It should look something like:
+
+```
+.
+├── Battle.net.dll
+├── ...
+├── Data
+│   ├── ...
+│   └── ruRU
+├── ...
+├── Wow.exe
+└── WTF
 ```
 
-Once transferred, load the images and initialize the containers
+Then open *WTF/Config.wtf* file in an text editor and replace *SET locale "enUS"* with *SET locale "ruRU"*.
 
-```sh
-docker load < ~/wow-server-playerbots/wow-compiled-images.tar
+
+## Adding game to Steam
+
+Now go to *Steam* -> *Library* -> *Add a game* -> *Add a Non-Steam game* and put a path to *WoW.exe*. 
+
+### Forcing game to use russian locale
+
+Now open game's properties and insert this command to *Launch Options*:
+
+```
+LC_ALL=ru_RU.UTF-8 LANG=ru_RU.UTF-8 %command%
 ```
 
-```sh
-cd ~/wow-server-playerbots
-docker compose up --no-build --no-start
-```
+> [!NOTE]
+> If you use *Linux* download [ProtonUp-Qt](https://github.com/DavidoTek/ProtonUp-Qt) and install latest *GE-Proton* with it. And force *WoW.exe* to use *GE-Proton* in *Steam* properties.
 
-and run the installation script
-
-```sh
-cd ~/
-./install-wow-wotlk.sh
-```
-
-# Credits
-
-- Installation script: https://github.com/DadsMmoLab/dads-mmo-lab
-- AzerothCore: https://github.com/mod-playerbots/azerothcore-wotlk.git
-- mod-player-bots: https://github.com/mod-playerbots/mod-playerbots.git
-
-# Steam Customization
-
-You may find nice background here: https://www.steamgriddb.com/search/grids?term=World+of+warcraft
-
-# Console Port
-
-Generally just follow the guide from this repository: https://github.com/leoaviana/ConsolePortLK
-
-I've added `WoWpadX.exe -l "/Path/To/WoW.exe"` to launch settings and
-everything worked just fine.
-
-
+> [!NOTE]
+> If you'd like to change server you connect to add a line this line `set realmlist  <server_address>` to `*Data/ruRU/realmlist.wtf*
