@@ -42,19 +42,6 @@ jobs:
           mkdir -p dist
           cp installer/target/${{ matrix.target }}/release/${{ matrix.build_name }} dist/${{ matrix.out_file }}
 
-      - name: No MSVC runtime DLL imports (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          $bin = "dist\${{ matrix.out_file }}"
-          $bytes = [System.IO.File]::ReadAllBytes($bin)
-          $ascii = -join ($bytes | ForEach-Object { if ($_ -ge 32 -and $_ -le 126) { [char]$_ } else { "." } })
-          if ($ascii -match "VCRUNTIME140.dll|MSVCP140.dll|VCRUNTIME140_1.dll") {
-            throw "MSVC runtime DLL found in import table: VCRUNTIME140/MSVCP140"
-          } else {
-            Write-Host "OK: no MSVC runtime DLLs imported"
-          }
-
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:

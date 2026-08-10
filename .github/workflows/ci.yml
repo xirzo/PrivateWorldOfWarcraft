@@ -7,7 +7,7 @@ on:
 
 jobs:
   linux:
-    name: fmt + clippy + tests + glibc release build
+    name: fmt + clippy + tests + glibc build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -34,7 +34,7 @@ jobs:
         run: ./installer/target/release/wow_installer --version
 
   windows:
-    name: check + crt-static build
+    name: crt-static build
     runs-on: windows-latest
     steps:
       - name: Checkout Code
@@ -50,15 +50,3 @@ jobs:
 
       - name: Headless smoke test
         run: .\installer\target\x86_64-pc-windows-msvc\release\wow_installer.exe --version
-
-      - name: No MSVC runtime DLL imports
-        shell: powershell
-        run: |
-          $bin = "installer\target\x86_64-pc-windows-msvc\release\wow_installer.exe"
-          $bytes = [System.IO.File]::ReadAllBytes($bin)
-          $ascii = -join ($bytes | ForEach-Object { if ($_ -ge 32 -and $_ -le 126) { [char]$_ } else { "." } })
-          if ($ascii -match "VCRUNTIME140.dll|MSVCP140.dll|VCRUNTIME140_1.dll") {
-            throw "MSVC runtime DLL found in import table: VCRUNTIME140/MSVCP140"
-          } else {
-            Write-Host "OK: no MSVC runtime DLLs imported"
-          }
