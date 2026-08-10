@@ -73,7 +73,7 @@ pub fn apply_config(opts: ApplyConfig<'_>, on: &FlowCallback<'_>) -> Result<()> 
                 locale: id.clone(),
                 event: DownloadEvent::Connecting,
             });
-            http::download(url, &patch, spec.sha256.as_deref(), opts.cancel, &|e| {
+            http::download(url, &patch, spec.effective_sha256(), opts.cancel, &|e| {
                 on(&FlowEvent::DownloadLocale {
                     locale: id.clone(),
                     event: e,

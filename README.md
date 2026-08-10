@@ -6,6 +6,19 @@
 
 [Server-side guide](README.server.md)
 
+## Installer (recommended)
+
+Use the [GUI installer](https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/latest)
+(`wow_installer`) — one self-contained binary for Windows and Linux. It downloads the
+client, applies the ruRU localization, sets the game server and guides you through Steam
+integration. No Python or other runtime is required; the Linux build is statically linked.
+
+> [!TIP]
+> The installer writes `set realmlist 127.0.0.1` by default (your local server). To play
+> on a real server, enter its address in the installer's *Choose your server* screen.
+
+The manual steps below still work if you prefer to do it yourself.
+
 ## Downloading client
 
 Download client from [ChromieCraft](https://chromiecraft.com/en/downloads/),
