@@ -7,8 +7,8 @@
   },
   "ruRU": {
     "name": "Русский",
-    "url": "https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/download/patches/wow-ruRU-3.3.5a.zip",
-    "sha256": "TODO_FILL_IN",
+    "url": "https://drive.google.com/file/d/12qOajbaFvaeBxGHezmYk27dcn7Q8BnyL/view?usp=sharing",
+    "sha256": "63a356cb279e2276722feb0a8465c38cb9c55b5520892a88e60246f9bfc61284",
     "set_locale": "ruRU"
   }
 }
