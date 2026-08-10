@@ -1,4 +1,3 @@
-<!-- TODO: guide on adding language to server https://github.com/azerothcore/azerothcore-wotlk/discussions/12424#discussioncomment-3196636 -->
 # How To
 
 *build_docker_image.sh* is used to offload building the server to a better PC, as I don't wanna do what on a steamdeck.
@@ -54,17 +53,59 @@ Answer *y* to the script prompts until step 2. When it asks about building image
 
 Proceed with the guide for server (you don't need to install neither *GE-Proton* nor client). [Guide](https://github.com/DadsMmoLab/dads-mmo-lab)
 
-## Forwarding ports
+## Networking
 
-In order for players to connect not from your *LAN*, you need to forward the
-ports on your router.
+In order for players to connect from outside your *LAN*, you need to forward the ports on your router.
 
-[AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk.git) suggests to forward two mandatory *TCP* ports: 
+[AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk.git) suggests forwarding two mandatory *TCP* ports:
 
-- 3724 (for the authserver) 
-- 8085 (for the worldserver)
+* **3724** (for the authserver)
+* **8085** (for the worldserver)
 
-More info: https://www.azerothcore.org/wiki/networking
+> [!WARNING]
+> Do not open your MySQL port publicly to the internet. If you need to connect to your database from an external machine, use a SSH tunnel
+
+More info: [https://www.azerothcore.org/wiki/networking](https://www.azerothcore.org/wiki/networking)
+
+### Configuring Database Realmlist IP
+
+You need to make sure that your authserver application directs incoming connections to your realm by setting the correct IP address in the database.
+
+#### 1. Retrieve MySQL Root Password
+
+Find your running database container and inspect its environment variables to retrieve the password:
+
+```sh
+docker exec $(docker ps --format '{{.Names}}' | grep -i "ac-database" | head -1) env | grep MYSQL_ROOT_PASSWORD
+```
+
+*(Default root password is usually `password`)*
+
+#### 2. Connect to the MySQL Shell
+
+Connect directly to the database container's MySQL CLI:
+
+```sh
+docker exec -it $(docker ps --format '{{.Names}}' | grep -i "ac-database" | head -1) mysql -u root -p
+```
+
+#### 3. Update Realmlist Table
+
+Once inside the MySQL shell, select the `acore_auth` database and update your realm's address:
+
+```sql
+USE acore_auth;
+
+SELECT id, name, address FROM realmlist;
+
+UPDATE realmlist SET address = 'YOUR_IP_HERE' WHERE id = 1;
+```
+
+Replace `'YOUR_IP_HERE'` based on your network environment:
+
+- **`127.0.0.1`**: If AzerothCore and your WoW client are on the same machine.
+- **LAN IP (`192.168.x.x`)**: If hosting on a separate PC on your local home network.
+- **Public IP**: If allowing players outside your home network to connect.
 
 ## Changing server locale
 
