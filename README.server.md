@@ -1,6 +1,6 @@
 # How To
 
-*build_docker_image.sh * is used to offload building the server to a better PC, as I don't wanna do what on a steamdeck.
+*build_docker_image.sh* is used to offload building the server to a better PC, as I don't wanna do what on a steamdeck.
 
 It just clones [AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk.git) and [mod-player-bots](https://github.com/mod-playerbots/mod-playerbots.git), then generates a `docker-compose.override.yml` file and triggers the build.
 
@@ -52,6 +52,18 @@ cd ~/
 Answer *y* to the script prompts until step 2. When it asks about building images, accept – it will detect that the images are already built.
 
 Proceed with the guide for server (you don't need to install neither *GE-Proton* nor client). [Guide](https://github.com/DadsMmoLab/dads-mmo-lab)
+
+## Forwarding ports
+
+In order for players to connect not from your *LAN*, you need to forward the
+ports on your router.
+
+[AzerothCore](https://github.com/mod-playerbots/azerothcore-wotlk.git) suggests to forward two mandatory *TCP* ports: 
+
+- 3724 (for the authserver) 
+- 8085 (for the worldserver)
+
+More info: https://www.azerothcore.org/wiki/networking
 
 ## Steam Customization
 
