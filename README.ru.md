@@ -2,67 +2,13 @@
   <img width="1200" height="776" alt="a" src="https://github.com/user-attachments/assets/4cdb1172-80bb-4fe8-8d43-429717f17b5e" />
 </p>
 
-## Скачивание клиента
+**Гайды:** [Ручная установка (RU)](README.manual.ru.md) · [Manual installation (EN)](README.manual.md) · [Гайд по серверу](README.server.md)
 
-Скачайте клиент с [ChromieCraft](https://chromiecraft.com/en/downloads/), вы можете скачать его из другого места, просто убедитесь, что он чистый. Затем распакуйте его в любую папку.
+## Установщик (рекомендуется)
 
-## Установка русской локализации
+Воспользуйтесь [установщиком](https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/latest)
+(`wow_installer`) — один исполняемый файл для Windows и Linux. Он сам скачает клиент,
+установит русскую локализацию, настроит сервер и добавит игру в Steam.
 
-Проще всего воспользоваться [установщиком](https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/latest) — он сам скачает клиент, установит русскую локализацию, настроит сервер и добавит игру в Steam.
-
-Ручная установка (если вы предпочитаете сделать это самостоятельно): скачайте русскую локализацию со страницы [Релизов](https://github.com/xirzo/PrivateWorlfOfWarcraft/releases) (артефакт `wow-ruRU-3.3.5a.zip`) и распакуйте её содержимое в корневую папку игры.
-
-Должно получиться примерно так:
-
-```
-.
-├── Battle.net.dll
-├── ...
-├── Data
-│   ├── ...
-│   └── ruRU
-├── ...
-├── Wow.exe
-└── WTF
-```
-
-Затем откройте файл *WTF/Config.wtf* в текстовом редакторе и замените *SET locale "enUS"* на *SET locale "ruRU"*. (Вы можете сделать файлы *WTF/Config.wtf* и *Data/ruRU/realmlist.wtf* доступными только для чтения, но сначала попробуйте без этого).
-
-
-## Добавление игры в Steam
-
-Теперь перейдите в *Steam* -> *Библиотека* -> *Добавить игру* -> *Добавить стороннюю игру* и укажите путь к *WoW.exe*. 
-
-После добавления **запускайте игру из *Steam***: найдите *WoW* в своей *Библиотеке* и нажмите *Играть*. Не запускайте *WoW.exe* напрямую из файлового менеджера — для работы игры должен быть запущен *Steam* (а на Linux ещё и *Proton*).
-
-> [!NOTE]
-> Если вы используете *Linux*, скачайте [ProtonUp-Qt](https://github.com/DavidoTek/ProtonUp-Qt) и установите последнюю версию *GE-Proton* через него. И принудительно запускайте *WoW.exe* через *GE-Proton* в свойствах *Steam*.
-
-> [!TIP]
-> По умолчанию игра подключается к вашему **локальному** серверу по адресу `127.0.0.1`. Если вы хотите играть на реальном сервере, вы **обязательно** должны изменить это: откройте файл `Data/ruRU/realmlist.wtf` в текстовом редакторе и убедитесь, что в нём ровно `set realmlist <адрес_сервера>`, заменив `<адрес_сервера>` на IP-адрес или имя сервера (например, `set realmlist 192.168.1.50`). Сохраните файл и запустите игру из *Steam*. Если я дал вам этот гайд — попросите IP у меня.
-
-### Принудительное использование русской локализации в игре
-
-Теперь откройте свойства игры и вставьте эту команду в *Параметры запуска*:
-
-```
-LC_ALL=ru_RU.UTF-8 LANG=ru_RU.UTF-8 %command%
-```
-
-Готово!
-
-## Console Port (Xbox Gamepad/Steamdeck) (НЕОБЯЗАТЕЛЬНО)
-
-Если вы хотите иметь поддержку геймпада в игре, используйте Console Port. Просто следуйте руководству из репозитория: https://github.com/leoaviana/ConsolePortLK
-
-Я добавил `WoWpadX.exe -l "/Путь/К/WoW.exe"` в настройки запуска и `PROTON_REMOTE_DEBUG_CMD="/Абсолютный_путь/К_вашему_исполняемому_файлу_WoWPadX/здесь" %command%` в *WoW.exe*. Всё, кажется, работает (по большей части).
-
-# Настройка Steam (НЕОБЯЗАТЕЛЬНО)
-
-Красивые баннеры/фоны/иконки можно найти здесь: https://www.steamgriddb.com/search/grids?term=World+of+warcraft
-
-# Благодарности
-
-- ConsolePort: https://github.com/leoaviana/ConsolePortLK
-- ChromieCraft: https://chromiecraft.com/en/downloads
-- steamgriddb: https://www.steamgriddb.com/search/grids?term=World+of+warcraft
+Хотите вручную? [Руководство по ручной установке](README.manual.ru.md)
+([по-английски](README.manual.md)).

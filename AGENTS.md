@@ -7,7 +7,8 @@ Guidance for AI agents and contributors working in this repository.
 Single-repo project for running a WoW 3.3.5a (WotLK) private server with playerbots and provisioning the game client.
 
 - `install-wow-wotlk.sh` — bash installer for the server side (Docker, AzerothCore + Playerbots).
-- `README.md` / `README.ru.md` — user guide: download client, add to Steam, set realmlist.
+- `README.md` / `README.ru.md` — user guide front page: GUI installer overview + links.
+- `README.manual.md` / `README.manual.ru.md` — manual install guides (download client, add to Steam, set realmlist).
 - `README.server.md` — server-side networking guide.
 - `scripts/installer.py` — **legacy** Python/tkinter GUI installer prototype. To be replaced by the Rust installer built on this branch. Do not extend it.
 - `build_docker_image.sh`, `transfer.sh` — server-side helpers.
