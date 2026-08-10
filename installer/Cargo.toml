@@ -1,0 +1,52 @@
+[package]
+name = "wow_installer"
+version = "0.1.0"
+edition = "2024"
+description = "Statically-linked GUI installer for the WoW 3.3.5a client (Windows/Linux)"
+license = "MIT"
+
+[[bin]]
+name = "wow_installer"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.6", features = ["derive", "env", "wrap_help"] }
+directories = "6.0.0"
+flate2 = "1.1.9"
+futures = "0.3.33"
+librqbit = { version = "8.1.1", default-features = false, features = ["rust-tls"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "blocking", "http2", "json", "stream"] }
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+thiserror = "2.0.20"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "time", "sync", "signal"] }
+toml = "1.1.4"
+zip = { version = "8.6.0", default-features = false, features = ["deflate", "time"] }
+
+[features]
+default = ["gui"]
+gui = ["dep:eframe", "dep:egui"]
+
+[dependencies.eframe]
+version = "0.36.1"
+optional = true
+default-features = false
+features = ["glow", "default_fonts", "x11", "wayland", "accesskit"]
+
+[dependencies.egui]
+version = "0.36.1"
+optional = true
+
+# rqbit's SHA-1 wrapper is patched to use `ring` (pure Rust) instead of
+# `aws-lc-rs` so the binary stays free of the C `aws-lc` dependency and
+# links statically against musl.
+[patch.crates-io]
+librqbit-sha1-wrapper = { path = "vendor/librqbit-sha1-wrapper" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
