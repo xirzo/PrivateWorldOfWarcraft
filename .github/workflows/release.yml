@@ -1,0 +1,72 @@
+name: Build and Release Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            build_name: wow_installer
+            out_file: wow_installer-linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            build_name: wow_installer.exe
+            out_file: wow_installer-windows-x86_64.exe
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build static release
+        run: cargo build --release --manifest-path installer/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Stage artifact
+        run: |
+          mkdir -p dist
+          cp installer/target/${{ matrix.target }}/release/${{ matrix.build_name }} dist/${{ matrix.out_file }}
+
+      - name: Static-link assertion (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          file dist/${{ matrix.out_file }} | grep -q "statically linked"
+          ldd dist/${{ matrix.out_file }} 2>&1 | grep -q "statically linked"
+
+      - name: No MSVC runtime DLL imports (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $bin = "dist\${{ matrix.out_file }}"
+          $bytes = [System.IO.File]::ReadAllBytes($bin)
+          $ascii = -join ($bytes | ForEach-Object { if ($_ -ge 32 -and $_ -le 126) { [char]$_ } else { "." } })
+          if ($ascii -match "VCRUNTIME140.dll|MSVCP140.dll|VCRUNTIME140_1.dll") {
+            throw "MSVC runtime DLL found in import table: VCRUNTIME140/MSVCP140"
+          } else {
+            Write-Host "OK: no MSVC runtime DLLs imported"
+          }
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.out_file }}
+          generate_release_notes: true
