@@ -43,7 +43,22 @@ pub fn download(
     }
 
     on_progress(DownloadEvent::Connecting);
-    let resp = client()?.get(url).send()?;
+    // Drive share links (/file/d/<ID>/view…) are resolved to the
+    // uc?export=download endpoint first; the returned page is never the file.
+    let drive_id = if is_drive_url(url) {
+        Some(drive_file_id(url).ok_or_else(|| {
+            Error::Msg(format!(
+                "could not extract file id from Google Drive URL: {url}"
+            ))
+        })?)
+    } else {
+        None
+    };
+    let request_url = match &drive_id {
+        Some(id) => format!("https://drive.google.com/uc?export=download&id={id}"),
+        None => url.to_string(),
+    };
+    let resp = client()?.get(&request_url).send()?;
     let status = resp.status();
     if !status.is_success() {
         return Err(Error::Msg(format!("server returned {status} for {url}")));
@@ -56,7 +71,7 @@ pub fn download(
         .map(|ct| ct.contains("text/html"))
         .unwrap_or(false);
 
-    let resp = if is_drive_url(url) && is_html {
+    let resp = if drive_id.is_some() && is_html {
         // Drive served the virus-scan confirmation page instead of the file.
         let html = resp.text()?;
         let token = drive_confirm_token(&html).ok_or_else(|| {
@@ -64,13 +79,9 @@ pub fn download(
                 "Google Drive confirmation page did not include a download token".to_string(),
             )
         })?;
-        let id = drive_file_id(url).ok_or_else(|| {
-            Error::Msg(format!(
-                "could not extract file id from Google Drive URL: {url}"
-            ))
-        })?;
         let mut dl_url = format!(
-            "https://drive.usercontent.google.com/download?id={id}&export=download&confirm={token}"
+            "https://drive.usercontent.google.com/download?id={}&export=download&confirm={token}",
+            drive_id.as_deref().unwrap()
         );
         if let Some(uuid) = drive_uuid(&html) {
             dl_url.push_str(&format!("&uuid={uuid}"));
@@ -81,6 +92,17 @@ pub fn download(
             return Err(Error::Msg(format!(
                 "Google Drive download returned {status}"
             )));
+        }
+        let still_html = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|ct| ct.contains("text/html"))
+            .unwrap_or(false);
+        if still_html {
+            return Err(Error::Msg(
+                "Google Drive returned an unexpected page instead of the file".to_string(),
+            ));
         }
         resp
     } else {
@@ -285,5 +307,28 @@ mod tests {
         assert_eq!(drive_confirm_token(html).as_deref(), Some("t3kEN123"));
         assert_eq!(drive_uuid(html).as_deref(), Some("xyz-456"));
         assert_eq!(drive_confirm_token("<html>no form here</html>"), None);
+    }
+
+    #[test]
+    fn checksum_mismatch_rejects_and_deletes() {
+        let dir = std::env::temp_dir().join(format!(
+            "wow_installer_http_mismatch_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("f.bin");
+        fs::write(&path, b"abc").unwrap();
+        let err = verify_sha256(
+            &path,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap_err();
+        assert!(matches!(err, Error::ChecksumMismatch { .. }));
+        assert!(!path.exists(), "corrupt file must be deleted");
+        fs::remove_dir_all(dir).unwrap();
     }
 }
