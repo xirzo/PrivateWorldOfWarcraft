@@ -1,0 +1,14 @@
+{
+  "enUS": {
+    "name": "English (US)",
+    "url": null,
+    "sha256": null,
+    "set_locale": "enUS"
+  },
+  "ruRU": {
+    "name": "Русский",
+    "url": "https://github.com/DadsMmoLab/wow-offline-installer/releases/download/patches/wow-ruRU-3.3.5a.zip",
+    "sha256": "TODO_FILL_IN",
+    "set_locale": "ruRU"
+  }
+}

@@ -1,3 +1,6 @@
 wow-server-playbots
 wow-compiled-images.tar
 *.swp
+
+# Rust build artifacts
+installer/target/
