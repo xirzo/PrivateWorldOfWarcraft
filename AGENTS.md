@@ -127,7 +127,7 @@ Runtime deps must stay C-free: verify `flate2` uses `miniz_oxide`, `reqwest` use
 - **M2 — Download engine**: `engine::torrent` (rqbit, magnet, progress events, cancel/resume) + `engine::http` (progress, checksum). Headless test with a tiny seeded torrent fixture.
 - **M3 — Extraction**: `core::extract` with progress, top-level-folder detection/stripping, `zip` crate. Unit-tested with a synthetic client zip.
 - **M4 — GUI wizard**: egui app with all screens wired to core/engine. Focus on the install flow end-to-end (download → extract → finish) before localization.
-- **M5 — Localization pipeline**: ship `locales.json` + patch artifacts (ruRU first) on GitHub Releases, apply + `Config.wtf` locale logic wired into the wizard. Replace the Google Drive link everywhere.
+- **M5 — Localization pipeline**: ship `locales.json` + patch artifacts (ruRU first) on GitHub Releases (or a Google Drive share link, which the HTTP engine resolves and SHA-256-verifies), apply + `Config.wtf` locale logic wired into the wizard.
 - **M6 — Server selection + Steam**: server choice screen (default 127.0.0.1, custom host[:port], persists last used), realmlist writes into all locales, Steam detection + guided integration + desktop shortcuts, finish screen with Launch.
 - **M7 — Release hardening**: static-verification CI step, matrix release on tags, docs update (README/README.ru.md), remove `scripts/installer.py` + `scripts/README.md`, cleanup `feat/installer` reference.
 
@@ -171,7 +171,7 @@ ldd installer/target/x86_64-unknown-linux-musl/release/wow_installer    # expect
 1. One static binary per OS (Windows `.exe`, Linux ELF) with no runtime installs.
 2. Full flow works end-to-end: download → extract → optional localization → choose server → realmlist written to all locales → Steam guidance → Launch.
 3. Default server is `127.0.0.1`, and the UI clearly explains how/when to change it.
-4. ruRU localization downloadable and correctly applied (Config.wtf `SET locale "ruRU"`), no Google Drive anywhere.
+4. ruRU localization downloadable and correctly applied (Config.wtf `SET locale "ruRU"`). Google Drive share links are supported by the HTTP engine (share-link → confirm-token → download) **but always SHA-256-verified** — the old unverified Drive folder was corrupted, which is why verification is mandatory.
 5. Cancel/resume/repair behave correctly and temp artifacts are cleaned up.
 6. `ldd` shows "not a dynamic executable" on the Linux build; Windows build imports only system DLLs.
 7. README.md and README.ru.md updated to point users at the new installer.
