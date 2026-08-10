@@ -1,4 +1,10 @@
+<p align="center">
+  <img width="1200" height="776" alt="a" src="https://github.com/user-attachments/assets/4cdb1172-80bb-4fe8-8d43-429717f17b5e" />
+</p>
+
 [Русская версия с установкой локализации](README.ru.md)
+
+[Server-side guide](README.server.md)
 
 ## Downloading client
 
@@ -13,8 +19,8 @@ Now go to *Steam* -> *Library* -> *Add a game* -> *Add a Non-Steam game* and put
 > [!NOTE]
 > If you use *Linux* download [ProtonUp-Qt](https://github.com/DavidoTek/ProtonUp-Qt) and install latest *GE-Proton* with it. And force *WoW.exe* to use *GE-Proton* in *Steam* properties.
 
-> [!NOTE]
-> If you'd like to change server you connect to add a line this line `set realmlist <server_address>` to `*Data/enUS/realmlist.wtf*
+> [!TIP]
+> If you'd like to change server you connect to add a line this line `set realmlist <server_address>` to *Data/enUS/realmlist.wtf*
 
 ## Console Port (Xbox Gamepad/Steamdeck)
 
