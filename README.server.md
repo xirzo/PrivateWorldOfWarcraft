@@ -1,3 +1,4 @@
+<!-- TODO: guide on adding language to server https://github.com/azerothcore/azerothcore-wotlk/discussions/12424#discussioncomment-3196636 -->
 # How To
 
 *build_docker_image.sh* is used to offload building the server to a better PC, as I don't wanna do what on a steamdeck.
@@ -64,6 +65,11 @@ ports on your router.
 - 8085 (for the worldserver)
 
 More info: https://www.azerothcore.org/wiki/networking
+
+## Changing server locale
+
+Edit `~/wow-server-playerbots/env/dist/etc/worldserver.conf`, find *RealmZone
+= xxx* and set to wanted locale, optionally change *DBC.Locale* too.
 
 ## Steam Customization
 
