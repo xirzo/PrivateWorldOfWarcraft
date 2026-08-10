@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    name: fmt + clippy + tests + musl static build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path installer/Cargo.toml --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path installer/Cargo.toml --features gui -- -D warnings
+
+      - name: Run tests
+        run: cargo test --manifest-path installer/Cargo.toml --features gui
+
+      - name: Build static release (musl)
+        run: cargo build --release --manifest-path installer/Cargo.toml --target x86_64-unknown-linux-musl
+
+      - name: Headless smoke test
+        run: ./installer/target/x86_64-unknown-linux-musl/release/wow_installer --version
+
+      - name: Static-link assertion
+        run: |
+          file installer/target/x86_64-unknown-linux-musl/release/wow_installer | grep -q "statically linked"
+          ldd installer/target/x86_64-unknown-linux-musl/release/wow_installer 2>&1 | grep -q "statically linked"
+
+  windows:
+    name: check + crt-static build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build static release (msvc crt-static)
+        run: cargo build --release --manifest-path installer/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Headless smoke test
+        run: .\installer\target\x86_64-pc-windows-msvc\release\wow_installer.exe --version
+
+      - name: No MSVC runtime DLL imports
+        shell: powershell
+        run: |
+          $bin = "installer\target\x86_64-pc-windows-msvc\release\wow_installer.exe"
+          $bytes = [System.IO.File]::ReadAllBytes($bin)
+          $ascii = -join ($bytes | ForEach-Object { if ($_ -ge 32 -and $_ -le 126) { [char]$_ } else { "." } })
+          if ($ascii -match "VCRUNTIME140.dll|MSVCP140.dll|VCRUNTIME140_1.dll") {
+            throw "MSVC runtime DLL found in import table: VCRUNTIME140/MSVCP140"
+          } else {
+            Write-Host "OK: no MSVC runtime DLLs imported"
+          }
