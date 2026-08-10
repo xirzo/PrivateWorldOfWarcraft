@@ -18,7 +18,6 @@ panic() {
     exit 1
 }
 
-TARBALL="wow-compiled-images.tar"
 INSTALL_SCRIPT="install-wow-wotlk.sh"
 SERVER_DIR="wow-server-playerbots"
 
