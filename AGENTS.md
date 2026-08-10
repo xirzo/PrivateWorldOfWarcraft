@@ -43,7 +43,7 @@ Component choices (all pure-Rust so the binary stays static):
 
 | Concern | Crate | Notes |
 | --- | --- | --- |
-| GUI | `eframe`/`egui` | winit backend dlopens X11/Wayland/GL at runtime, so the app can otherwise be fully static |
+| GUI | `eframe`/`egui` | winit backend dlopens X11/Wayland/GL at runtime, so the Linux build links glibc (see below) |
 | Torrent | `librqbit` (rqbit) | magnet link, progress/peers, pause/resume, cancel; pure Rust |
 | HTTP | `reqwest` with `rustls` | no OpenSSL dependency |
 | ZIP | `zip` + `flate2` (miniz_oxide) | pure Rust backends, no zlib C dep |
@@ -53,17 +53,17 @@ Component choices (all pure-Rust so the binary stays static):
 
 ### Static linking definition
 
-"Statically linked" = one self-contained executable with all app code, crates and Rust std linked in; **no Python, no external runtime, no app-level DLLs/.so files**. Only unavoidable OS facilities may be used at runtime:
+"Self-contained" = one executable with all app code, crates and Rust std linked in; **no Python, no external runtime, no app-level DLLs/.so files**. Only unavoidable OS facilities may be used at runtime:
 
 - **Windows**: fully static via `-C target-feature=+crt-static` (no VC++ runtime DLL). Imports only system DLLs (`kernel32`, `user32`, `ws2_32`, ...).
-- **Linux**: `x86_64-unknown-linux-musl` target → statically linked musl libc. egui/winit `dlopen`s X11/Wayland/GL at runtime, so a stock desktop still works, but `ldd` reports "not a dynamic executable".
+- **Linux**: standard glibc-linked release build. winit must `dlopen` X11/Wayland/GL at runtime, and a fully static binary (musl) has no dynamic loader — `dlopen` always fails — so static musl cannot open a GUI. glibc is present on every desktop distro, so the glibc build runs anywhere a desktop exists.
 
 ## Project layout
 
 ```
 installer/
   Cargo.toml
-  .cargo/config.toml         # static-link target flags (see below)
+  .cargo/config.toml         # crt-static flags for the static Windows target (see below)
   locales.json               # locale patch registry: id -> {name, url, sha256, set_locale}
   src/
     main.rs                  # entry: parse CLI flags, launch GUI or headless mode
@@ -118,11 +118,14 @@ rustflags = ["-C", "target-feature=+crt-static"]
 rustflags = ["-C", "target-feature=+crt-static"]
 ```
 
+The Linux musl target is only usable for headless `--cli` builds (no GUI). The shipped
+Linux binary is a standard glibc release build (host target, no `--target` flag).
+
 Runtime deps must stay C-free: verify `flate2` uses `miniz_oxide`, `reqwest` uses `rustls-tls`, no `openssl-sys`/`libtorrent2`.
 
 ## Milestones
 
-- **M0 — Scaffold**: create `installer/` crate, `.cargo/config.toml`, GitHub Actions skeleton (matrix build linux-musl + windows-msvc), `--version` smoke test, README section.
+- **M0 — Scaffold**: create `installer/` crate, `.cargo/config.toml`, GitHub Actions skeleton (matrix build linux-gnu + windows-msvc), `--version` smoke test, README section.
 - **M1 — Core config logic**: `core::server`, `core::realmlist`, `core::locale` with full unit tests (this is the "choose server / apply language" heart — build it first, GUI-agnostic).
 - **M2 — Download engine**: `engine::torrent` (rqbit, magnet, progress events, cancel/resume) + `engine::http` (progress, checksum). Headless test with a tiny seeded torrent fixture.
 - **M3 — Extraction**: `core::extract` with progress, top-level-folder detection/stripping, `zip` crate. Unit-tested with a synthetic client zip.
@@ -137,19 +140,16 @@ Runtime deps must stay C-free: verify `flate2` uses `miniz_oxide`, `reqwest` use
 # Unit + integration tests (host)
 cargo test --manifest-path installer/Cargo.toml
 
-# Linux static build
-rustup target add x86_64-unknown-linux-musl
-cargo build --release --manifest-path installer/Cargo.toml --target x86_64-unknown-linux-musl
+# Linux release build (glibc — required for the GUI; winit dlopens X11/Wayland/GL)
+cargo build --release --manifest-path installer/Cargo.toml
 
 # Windows static build (native on windows runner; or via cargo-xwin from Linux)
 cargo build --release --manifest-path installer/Cargo.toml --target x86_64-pc-windows-msvc
 
 # Headless smoke test of the binary
-./installer/target/x86_64-unknown-linux-musl/release/wow_installer --version
+./installer/target/release/wow_installer --version
 
-# Static-link verification
-file installer/target/x86_64-unknown-linux-musl/release/wow_installer   # expect: "statically linked"
-ldd installer/target/x86_64-unknown-linux-musl/release/wow_installer    # expect: "not a dynamic executable"
+# Static-link verification (Windows only — the Linux build ships glibc by design)
 # Windows: dumpbin /dependents WoW_Installer.exe — only system DLLs
 ```
 
@@ -158,22 +158,22 @@ ldd installer/target/x86_64-unknown-linux-musl/release/wow_installer    # expect
 - **Unit tests** (M1, M3, M5): realmlist editing (replace/append/idempotent, per-locale), Config.wtf locale switching, zip extraction with/without top-level folder, checksum verify.
 - **Engine tests** (M2): download a tiny local torrent/HTTP fixture headless, assert progress events, cancel mid-download cleans temp files.
 - **GUI**: manual QA matrix — Windows 10/11, Steam Deck (SteamOS/Arch), Ubuntu, Fedora. `--cli` path tested in CI.
-- **Static check**: CI step asserting `ldd`/`file`/`dumpbin` output.
+- **Static check**: CI step asserting `dumpbin` output on Windows (no MSVC runtime DLL imports).
 
 ## CI/CD (GitHub Actions)
 
 - Reuse pattern from `feat/installer`'s `.github/workflows/release.yml` (matrix, tag-triggered releases) but with Rust toolchain and static targets.
-- On `push` / PR: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, headless `--version` smoke, static-link assertions.
-- On tag `v*`: build matrix `ubuntu-latest` (musl static) + `windows-latest` (crt-static), upload `dist/` artifacts to the release, generate release notes.
+- On `push` to `main` / PR: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, headless `--version` smoke, Windows static-link assertions.
+- On tag `v*`: build matrix `ubuntu-latest` (glibc) + `windows-latest` (crt-static), upload `dist/` artifacts to the release, generate release notes.
 
 ## Acceptance criteria
 
-1. One static binary per OS (Windows `.exe`, Linux ELF) with no runtime installs.
+1. One binary per OS (Windows `.exe`, Linux ELF) with no runtime installs — Windows fully static, Linux glibc-linked.
 2. Full flow works end-to-end: download → extract → optional localization → choose server → realmlist written to all locales → Steam guidance → Launch.
 3. Default server is `127.0.0.1`, and the UI clearly explains how/when to change it.
 4. ruRU localization downloadable and correctly applied (Config.wtf `SET locale "ruRU"`). Google Drive share links are supported by the HTTP engine (share-link → confirm-token → download) **but always SHA-256-verified** — the old unverified Drive folder was corrupted, which is why verification is mandatory.
 5. Cancel/resume/repair behave correctly and temp artifacts are cleaned up.
-6. `ldd` shows "not a dynamic executable" on the Linux build; Windows build imports only system DLLs.
+6. Windows build imports only system DLLs (no VCRUNTIME/MSVCP); the Linux build is a glibc release so `dlopen` of X11/Wayland works on desktop distros.
 7. README.md and README.ru.md updated to point users at the new installer.
 
 ## Conventions for agents

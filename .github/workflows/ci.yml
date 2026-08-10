@@ -7,7 +7,7 @@ on:
 
 jobs:
   linux:
-    name: fmt + clippy + tests + musl static build
+    name: fmt + clippy + tests + glibc release build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -17,10 +17,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: x86_64-unknown-linux-musl
-
-      - name: Install musl toolchain
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Check formatting
         run: cargo fmt --manifest-path installer/Cargo.toml --check
@@ -31,16 +27,11 @@ jobs:
       - name: Run tests
         run: cargo test --manifest-path installer/Cargo.toml --features gui
 
-      - name: Build static release (musl)
-        run: cargo build --release --manifest-path installer/Cargo.toml --target x86_64-unknown-linux-musl
+      - name: Build release (glibc)
+        run: cargo build --release --manifest-path installer/Cargo.toml
 
       - name: Headless smoke test
-        run: ./installer/target/x86_64-unknown-linux-musl/release/wow_installer --version
-
-      - name: Static-link assertion
-        run: |
-          file installer/target/x86_64-unknown-linux-musl/release/wow_installer | grep -q "statically linked"
-          ldd installer/target/x86_64-unknown-linux-musl/release/wow_installer 2>&1 | grep -q "statically linked"
+        run: ./installer/target/release/wow_installer --version
 
   windows:
     name: check + crt-static build
