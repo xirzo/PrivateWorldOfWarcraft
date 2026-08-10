@@ -24,6 +24,22 @@ pub struct LocaleSpec {
     pub set_locale: String,
 }
 
+impl LocaleSpec {
+    /// The expected SHA-256 when it is a real 64-char hex digest.
+    ///
+    /// Placeholders such as `TODO_FILL_IN` are treated as "no checksum
+    /// configured" so a half-published registry does not hard-fail; the
+    /// build script (`scripts/build-locale-patch.sh`) fills real digests in.
+    pub fn effective_sha256(&self) -> Option<&str> {
+        let s = self.sha256.as_deref()?.trim();
+        if s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+            Some(s)
+        } else {
+            None
+        }
+    }
+}
+
 pub const EMBEDDED_LOCALES_JSON: &str = include_str!("../../locales.json");
 
 /// Load the locale registry embedded in the binary.
@@ -210,5 +226,22 @@ mod tests {
         let en = spec("enUS").unwrap();
         assert_eq!(en.set_locale, "enUS");
         assert!(en.url.is_none());
+    }
+
+    #[test]
+    fn effective_sha256_ignores_placeholder() {
+        let spec = LocaleSpec {
+            name: "Русский".into(),
+            url: Some("https://example.com/ru.zip".into()),
+            sha256: Some("TODO_FILL_IN".into()),
+            set_locale: "ruRU".into(),
+        };
+        assert_eq!(spec.effective_sha256(), None);
+        let real = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        let spec = LocaleSpec {
+            sha256: Some(real.into()),
+            ..spec
+        };
+        assert_eq!(spec.effective_sha256(), Some(real));
     }
 }

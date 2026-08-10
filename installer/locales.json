@@ -7,7 +7,7 @@
   },
   "ruRU": {
     "name": "Русский",
-    "url": "https://github.com/DadsMmoLab/wow-offline-installer/releases/download/patches/wow-ruRU-3.3.5a.zip",
+    "url": "https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/download/patches/wow-ruRU-3.3.5a.zip",
     "sha256": "TODO_FILL_IN",
     "set_locale": "ruRU"
   }

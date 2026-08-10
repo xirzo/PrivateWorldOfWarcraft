@@ -88,8 +88,61 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ),
         );
 
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
+            ui.label(lang.s("Steam:", "Steam:"));
+            match crate::steam::detect_steam_root() {
+                Some(root) => {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(80, 180, 80),
+                        format!(
+                            "{} {}",
+                            lang.s("found at", "найден в"),
+                            root.display()
+                        ),
+                    );
+                }
+                None => {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(200, 150, 80),
+                        lang.s("not detected — install Steam first", "не обнаружен — установите Steam"),
+                    );
+                }
+            }
+        });
+
+        ui.add_space(8.0);
+        if ui
+            .checkbox(&mut app.add_to_steam, lang.s("Add a desktop shortcut", "Создать ярлык на рабочем столе"))
+            .changed()
+        {
+            app.cfg.add_to_steam = app.add_to_steam;
+            let _ = app.cfg.save();
+        }
+
+        if app.just_finished {
+            app.just_finished = false;
+            if app.add_to_steam {
+                app.create_desktop_shortcut();
+            }
+        }
+
+        if let Some(status) = &app.steam_status {
+            ui.add_space(6.0);
+            ui.label(egui::RichText::new(status).weak());
+        }
+
         ui.add_space(20.0);
         ui.horizontal(|ui| {
+            if ui
+                .add(
+                    egui::Button::new(lang.s("Create shortcut", "Создать ярлык"))
+                        .min_size(egui::vec2(150.0, 36.0)),
+                )
+                .clicked()
+            {
+                app.create_desktop_shortcut();
+            }
             let exe_path = format!("{install_dir}/{WOW_EXE}");
             if ui
                 .add(
@@ -98,6 +151,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 )
                 .clicked()
             {
+                let _ = crate::steam::open_steam_games();
                 open_path(&exe_path);
             }
             if ui

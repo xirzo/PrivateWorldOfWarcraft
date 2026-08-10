@@ -3,6 +3,7 @@ mod engine;
 mod error;
 mod flow;
 mod logging;
+mod steam;
 
 #[cfg(feature = "gui")]
 mod app;
