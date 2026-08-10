@@ -5,16 +5,17 @@ set -euo pipefail
 # write the result (URL + checksum) into installer/locales.json.
 #
 # Usage:
-#   scripts/build-locale-patch.sh <locale> <source_root> [output_dir]
+#   scripts/build-locale-patch.sh <locale> <source_root> [output_dir] [url]
 #
 # <source_root> must contain Data/<locale>/ — the folder to package. The
 # output zip contains Data/<locale>/... entries, matching the layout the
-# installer merges into the client. After building, upload the zip to the
-# `patches` GitHub Release and keep the URL in locales.json in sync (the
-# script already writes the canonical URL).
+# installer merges into the client. [url] overrides the download URL written
+# into locales.json (use a Google Drive share link, or omit it to default to
+# the `patches` GitHub Release). After building, upload the zip to that URL.
 #
 # Example:
-#   ./installer/scripts/build-locale-patch.sh ruRU ~/wow_client_ruRU dist
+#   ./installer/scripts/build-locale-patch.sh ruRU ~/wow_client_ruRU dist \
+#     "https://drive.google.com/file/d/AbC123xyz/view?usp=sharing"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
@@ -23,9 +24,10 @@ locales_json="$repo_root/installer/locales.json"
 locale="${1:-}"
 source_root="${2:-}"
 output_dir="${3:-$repo_root/dist}"
+url_override="${4:-}"
 
 if [[ -z "$locale" || -z "$source_root" ]]; then
-  echo "usage: $0 <locale> <source_root> [output_dir]" >&2
+  echo "usage: $0 <locale> <source_root> [output_dir] [url]" >&2
   exit 2
 fi
 
@@ -46,7 +48,11 @@ rm -f "$zip_path"
 )
 
 sha256="$(sha256sum "$zip_path" | awk '{print $1}')"
-url="https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/download/$release_tag/$(basename "$zip_path")"
+if [[ -n "$url_override" ]]; then
+  url="$url_override"
+else
+  url="https://github.com/xirzo/PrivateWorlfOfWarcraft/releases/download/$release_tag/$(basename "$zip_path")"
+fi
 
 python3 - "$locales_json" "$locale" "$url" "$sha256" <<'PY'
 import json
@@ -69,5 +75,9 @@ echo "Patch:      $zip_path"
 echo "SHA-256:    $sha256"
 echo "URL:        $url"
 echo
-echo "Upload it to the $release_tag GitHub Release:"
-echo "  gh release upload '$release_tag' '$zip_path'"
+if [[ -n "$url_override" ]]; then
+  echo "Upload '$zip_path' to the URL above and keep the link in locales.json in sync."
+else
+  echo "Upload it to the $release_tag GitHub Release:"
+  echo "  gh release upload '$release_tag' '$zip_path'"
+fi
