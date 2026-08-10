@@ -43,4 +43,11 @@ cd ~/
 
 You may find nice background here: https://www.steamgriddb.com/search/grids?term=World+of+warcraft
 
+# Console Port
+
+Generally just follow the guide from this repository: https://github.com/leoaviana/ConsolePortLK
+
+I've added `WoWpadX.exe -l "/Path/To/WoW.exe"` to launch settings and
+everything worked just fine.
+
 
