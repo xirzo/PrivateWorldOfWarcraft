@@ -38,3 +38,9 @@ cd ~/
 - Installation script: https://github.com/DadsMmoLab/dads-mmo-lab
 - AzerothCore: https://github.com/mod-playerbots/azerothcore-wotlk.git
 - mod-player-bots: https://github.com/mod-playerbots/mod-playerbots.git
+
+# Steam Customization
+
+You may find nice background here: https://www.steamgriddb.com/search/grids?term=World+of+warcraft
+
+
