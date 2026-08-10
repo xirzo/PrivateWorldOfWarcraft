@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
+            target: x86_64-unknown-linux-gnu
             build_name: wow_installer
             out_file: wow_installer-linux-x86_64
           - os: windows-latest
@@ -34,23 +34,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install musl toolchain (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-
-      - name: Build static release
+      - name: Build release
         run: cargo build --release --manifest-path installer/Cargo.toml --target ${{ matrix.target }}
 
       - name: Stage artifact
         run: |
           mkdir -p dist
           cp installer/target/${{ matrix.target }}/release/${{ matrix.build_name }} dist/${{ matrix.out_file }}
-
-      - name: Static-link assertion (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          file dist/${{ matrix.out_file }} | grep -q "statically linked"
-          ldd dist/${{ matrix.out_file }} 2>&1 | grep -q "statically linked"
 
       - name: No MSVC runtime DLL imports (Windows)
         if: runner.os == 'Windows'
