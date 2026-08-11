@@ -1,11 +1,11 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::core::extract::{ExtractProgress, extract_zip};
 use crate::core::locale;
 use crate::core::realmlist;
 use crate::core::server::Server;
-use crate::engine::events::DownloadEvent;
+use crate::engine::events::{DownloadEvent, ProgressCallback};
 use crate::engine::http;
 use crate::error::{Error, Result};
 
@@ -117,6 +117,64 @@ pub struct InstallClient<'a> {
     pub zip_path: &'a Path,
     pub install_dir: &'a Path,
     pub cancel: &'a AtomicBool,
+}
+
+/// Client archive download: BitTorrent first, optional direct HTTP fallback.
+pub struct DownloadClient<'a> {
+    /// Magnet link tried first via BitTorrent.
+    pub magnet: &'a str,
+    /// Direct HTTP(S) mirror used if the torrent fails (blocked network,
+    /// dead swarm, …). Pass `None` to disable the fallback.
+    pub http_fallback: Option<&'a str>,
+    /// Directory the downloaded zip is written to.
+    pub save_dir: &'a Path,
+    pub cancel: &'a AtomicBool,
+}
+
+/// Download the client archive into `save_dir` and return the path of the zip.
+///
+/// Tries the magnet via BitTorrent first. If it fails for any reason other
+/// than user cancellation, falls back to a plain HTTP(S) download of
+/// `http_fallback` (no checksum is available for the client archive). Progress
+/// from either engine is forwarded through `on_progress`; human-readable
+/// status lines (e.g. "switching to HTTP") go through `on_log`.
+pub fn download_client<'a>(
+    opts: DownloadClient<'a>,
+    on_progress: &'a ProgressCallback<'a>,
+    on_log: &dyn Fn(String),
+) -> Result<PathBuf> {
+    let magnet = opts.magnet;
+    let save_dir = opts.save_dir;
+    let cancel = opts.cancel;
+
+    let torrent =
+        crate::engine::torrent::download_torrent(crate::engine::torrent::TorrentOptions {
+            magnet,
+            save_dir,
+            cancel,
+            on_progress,
+        });
+
+    match torrent {
+        Ok(path) => Ok(path),
+        Err(Error::Cancelled) => Err(Error::Cancelled),
+        Err(e) => {
+            let Some(url) = opts.http_fallback else {
+                return Err(e);
+            };
+            on_log(format!(
+                "BitTorrent download failed ({e}); switching to direct HTTP download"
+            ));
+            let name = url
+                .rsplit('/')
+                .next()
+                .filter(|s| !s.is_empty())
+                .unwrap_or("client.zip");
+            let dest = save_dir.join(name);
+            http::download(url, &dest, None, cancel, on_progress)?;
+            Ok(dest)
+        }
+    }
 }
 
 /// Extract a downloaded client zip into the install directory.

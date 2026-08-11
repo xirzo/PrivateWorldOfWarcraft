@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -9,8 +10,9 @@ use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions};
 /// How long to keep trying to resolve torrent metadata (name/size) before
 /// giving up. Metadata needs outbound peer/tracker traffic; on networks that
 /// block BitTorrent this never succeeds, and rqbit's peer stream never ends on
-/// its own, so without a timeout the wizard would hang on "Downloading…".
-const METADATA_TIMEOUT: Duration = Duration::from_secs(120);
+/// its own, so without a timeout the wizard would hang on "Downloading…". The
+/// caller usually falls back to an HTTP mirror once this fires.
+const METADATA_TIMEOUT: Duration = Duration::from_secs(60);
 /// How often to report "still connecting" while metadata is resolving.
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(2);
 /// How long the initial file-integrity check may take after metadata arrives.
@@ -68,7 +70,9 @@ async fn download_torrent_async(opts: TorrentOptions<'_>) -> Result<PathBuf> {
     // Wait for the initial file-integrity check with a generous timeout.
     tokio::time::timeout(INIT_TIMEOUT, handle.wait_until_initialized())
         .await
-        .map_err(|_| Error::Msg("torrent metadata resolved but the client file check timed out".to_string()))?
+        .map_err(|_| {
+            Error::Msg("torrent metadata resolved but the client file check timed out".to_string())
+        })?
         .map_err(|e| Error::Msg(format!("failed to fetch torrent metadata: {e}")))?;
 
     let name = handle.name().unwrap_or_else(|| "client".to_string());
@@ -141,11 +145,11 @@ async fn download_torrent_async(opts: TorrentOptions<'_>) -> Result<PathBuf> {
 /// checks the cancel flag. On timeout, stops the session and returns a
 /// descriptive error instead of blocking forever.
 async fn add_torrent_with_progress(
-    session: &Session,
+    session: &Arc<Session>,
     magnet: &str,
     cancel: &AtomicBool,
     on_progress: &ProgressCallback<'_>,
-) -> Result<librqbit::ManagedTorrent> {
+) -> Result<Arc<librqbit::ManagedTorrent>> {
     let add = session.add_torrent(
         AddTorrent::from_url(magnet),
         Some(AddTorrentOptions {
@@ -181,8 +185,7 @@ async fn add_torrent_with_progress(
                 return Err(Error::Msg(
                     "could not fetch torrent metadata (no peers/trackers reachable). \
                      BitTorrent traffic may be blocked by the network, Windows Firewall \
-                     or antivirus. Allow outbound connections on ports 6881-6890, then \
-                     try again."
+                     or antivirus. Trying the HTTP fallback mirror."
                         .to_string(),
                 ));
             }

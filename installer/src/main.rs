@@ -23,9 +23,9 @@ use crate::core::config::AppConfig;
 use crate::core::extract::ExtractProgress;
 use crate::core::server::Server;
 use crate::engine::events::DownloadEvent;
-use crate::engine::torrent;
+use crate::engine::http;
 use crate::error::{Error, Result};
-use crate::flow::FlowEvent;
+use crate::flow::{DownloadClient, FlowEvent, download_client};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -183,7 +183,7 @@ fn run_cli(cli: Cli) -> Result<()> {
         println!(
             "Client source: {}",
             if client.starts_with("magnet:") {
-                "magnet link (BitTorrent)"
+                "magnet link (BitTorrent + HTTP fallback)"
             } else {
                 client
             }
@@ -191,39 +191,26 @@ fn run_cli(cli: Cli) -> Result<()> {
 
         let client_zip = if client.starts_with("magnet:") {
             println!("Downloading client via BitTorrent...");
-            torrent::download_torrent(torrent::TorrentOptions {
-                magnet: client,
-                save_dir: &temp_dir,
-                cancel: &cancel,
-                on_progress: &|e: DownloadEvent| match e {
-                    DownloadEvent::Connecting => println!("  connecting..."),
-                    DownloadEvent::Metadata { name, total_bytes } => {
-                        println!(
-                            "  downloading {name} ({})",
-                            human_bytes(total_bytes.unwrap_or(0))
-                        )
-                    }
-                    DownloadEvent::Progress {
-                        downloaded,
-                        total_bytes,
-                        speed_bps,
-                        peers,
-                    } => {
-                        let pct = total_bytes
-                            .map(|t| {
-                                if t > 0 {
-                                    downloaded as f64 / t as f64 * 100.0
-                                } else {
-                                    0.0
-                                }
-                            })
-                            .unwrap_or(0.0);
-                        let peers = peers.map(|p| format!(", peers: {p}")).unwrap_or_default();
-                        println!("  {pct:5.1}% ({}/s){peers}", human_bytes(speed_bps));
-                    }
-                    DownloadEvent::Done => println!("  download complete"),
+            download_client(
+                DownloadClient {
+                    magnet: client,
+                    http_fallback: Some(crate::core::client::CLIENT_HTTP_URL),
+                    save_dir: &temp_dir,
+                    cancel: &cancel,
                 },
-            })?
+                &print_download_event,
+                &|m| println!("* {m}"),
+            )?
+        } else if client.starts_with("http://") || client.starts_with("https://") {
+            println!("Downloading client via HTTP...");
+            let name = client
+                .rsplit('/')
+                .next()
+                .filter(|s| !s.is_empty())
+                .unwrap_or("client.zip");
+            let dest = temp_dir.join(name);
+            http::download(client, &dest, None, &cancel, &print_download_event)?;
+            dest
         } else {
             let p = PathBuf::from(client);
             if !p.exists() {
@@ -297,5 +284,37 @@ fn human_bytes(bytes: u64) -> String {
         format!("{value:.0} {}", UNITS[unit])
     } else {
         format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+/// CLI-facing download progress printer.
+fn print_download_event(e: DownloadEvent) {
+    match e {
+        DownloadEvent::Connecting => println!("  connecting..."),
+        DownloadEvent::Metadata { name, total_bytes } => {
+            println!(
+                "  downloading {name} ({})",
+                human_bytes(total_bytes.unwrap_or(0))
+            );
+        }
+        DownloadEvent::Progress {
+            downloaded,
+            total_bytes,
+            speed_bps,
+            peers,
+        } => {
+            let pct = total_bytes
+                .map(|t| {
+                    if t > 0 {
+                        downloaded as f64 / t as f64 * 100.0
+                    } else {
+                        0.0
+                    }
+                })
+                .unwrap_or(0.0);
+            let peers = peers.map(|p| format!(", peers: {p}")).unwrap_or_default();
+            println!("  {pct:5.1}% ({}/s){peers}", human_bytes(speed_bps));
+        }
+        DownloadEvent::Done => println!("  download complete"),
     }
 }
