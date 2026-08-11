@@ -31,7 +31,6 @@ impl WowInstallerApp {
         let cfg = AppConfig::load();
         let lang = Lang::detect();
         let dir = cfg.resolved_install_dir().to_string_lossy().to_string();
-        let add_to_steam = cfg.add_to_steam;
 
         let mut app = App {
             lang,
@@ -49,9 +48,7 @@ impl WowInstallerApp {
             cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             view: crate::ui::ProgressView::default(),
             logs: Vec::new(),
-            add_to_steam,
-            steam_status: None,
-            just_finished: false,
+            reinstall_patches: false,
         };
         app.refresh_dir_state();
         app.refresh_locale_flags();

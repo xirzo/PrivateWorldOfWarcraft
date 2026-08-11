@@ -1,4 +1,3 @@
-use crate::core::client::WOW_EXE;
 use crate::core::locale;
 use crate::core::server::Server;
 use crate::ui::{App, ServerMode};
@@ -76,8 +75,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.label(
             lang.s(
-                "1. Open Steam → Library → \"Add a game\" → \"Add a Non-Steam game\".\n2. Browse to and select WoW.exe in the install folder.\n3. Click Play on the newly added WoW entry.",
-                "1. Откройте Steam → Библиотека → «Добавить игру» → «Добавить стороннюю игру».\n2. Укажите файл WoW.exe в папке установки.\n3. Нажмите «Играть» на добавленной записи WoW.",
+                "1. Open Steam -> Library -> \"Add a game\" -> \"Add a Non-Steam game\".\n2. Browse to and select WoW.exe in the install folder.\n3. Click Play on the newly added WoW entry.",
+                "1. Откройте Steam -> Библиотека -> «Добавить игру» -> «Добавить стороннюю игру».\n2. Укажите файл WoW.exe в папке установки.\n3. Нажмите «Играть» на добавленной записи WoW.",
             ),
         );
         ui.add_space(4.0);
@@ -87,6 +86,34 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 "Не запускайте WoW.exe напрямую — должен работать Steam (и Proton на Linux).",
             ),
         );
+
+        if let Some(locale_id) = &current_locale
+            && locale_id != "enUS"
+        {
+            ui.add_space(16.0);
+                ui.label(
+                    egui::RichText::new(lang.s(
+                        "Force the game language",
+                        "Принудительная локализация",
+                    ))
+                    .size(16.0)
+                    .strong(),
+                );
+                ui.add_space(6.0);
+                let tag = locale_tag(locale_id);
+                let en = format!(
+                    "The game language is set to {locale_id}. If it still shows English, force it via Steam launch options: right-click WoW in your Library -> Properties -> Launch Options, paste this, then click Play:"
+                );
+                let ru = format!(
+                    "Язык игры установлен: {locale_id}. Если игра всё ещё на английском, укажите язык в параметрах запуска Steam: правый клик по WoW в Библиотеке -> Свойства -> Параметры запуска, вставьте эту команду и нажмите «Играть»:"
+                );
+                ui.label(lang.s(&en, &ru));
+                ui.add_space(4.0);
+                ui.label(
+                    egui::RichText::new(format!("LC_ALL={tag}.UTF-8 LANG={tag}.UTF-8 %command%"))
+                        .monospace(),
+                );
+        }
 
         ui.add_space(16.0);
         ui.horizontal(|ui| {
@@ -111,49 +138,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             }
         });
 
-        ui.add_space(8.0);
-        if ui
-            .checkbox(&mut app.add_to_steam, lang.s("Add a desktop shortcut", "Создать ярлык на рабочем столе"))
-            .changed()
-        {
-            app.cfg.add_to_steam = app.add_to_steam;
-            let _ = app.cfg.save();
-        }
-
-        if app.just_finished {
-            app.just_finished = false;
-            if app.add_to_steam {
-                app.create_desktop_shortcut();
-            }
-        }
-
-        if let Some(status) = &app.steam_status {
-            ui.add_space(6.0);
-            ui.label(egui::RichText::new(status).weak());
-        }
-
         ui.add_space(20.0);
         ui.horizontal(|ui| {
-            if ui
-                .add(
-                    egui::Button::new(lang.s("Create shortcut", "Создать ярлык"))
-                        .min_size(egui::vec2(150.0, 36.0)),
-                )
-                .clicked()
-            {
-                app.create_desktop_shortcut();
-            }
-            let exe_path = format!("{install_dir}/{WOW_EXE}");
-            if ui
-                .add(
-                    egui::Button::new(lang.s("Add to Steam…", "Добавить в Steam…"))
-                        .min_size(egui::vec2(150.0, 36.0)),
-                )
-                .clicked()
-            {
-                let _ = crate::steam::open_steam_games();
-                open_path(&exe_path);
-            }
             if ui
                 .add(
                     egui::Button::new(lang.s("Open folder", "Открыть папку"))
@@ -178,6 +164,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     });
 }
 
+/// "ruRU" -> "ru_RU", "enUS" -> "en_US" (POSIX-style locale tag).
+fn locale_tag(locale: &str) -> String {
+    let chars: Vec<char> = locale.chars().collect();
+    if chars.len() >= 4 {
+        let lang_part: String = chars[..2].iter().collect();
+        let region: String = chars[chars.len() - 2..].iter().collect();
+        format!(
+            "{}_{}",
+            lang_part.to_ascii_lowercase(),
+            region.to_ascii_uppercase()
+        )
+    } else {
+        locale.to_ascii_lowercase()
+    }
+}
+
 fn open_path(path: &str) {
     #[cfg(target_os = "linux")]
     let status = std::process::Command::new("xdg-open").arg(path).spawn();
@@ -190,5 +192,18 @@ fn open_path(path: &str) {
 
     if let Err(e) = status {
         crate::logging::log(format!("failed to open {path}: {e}"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::locale_tag;
+
+    #[test]
+    fn locale_tags() {
+        assert_eq!(locale_tag("ruRU"), "ru_RU");
+        assert_eq!(locale_tag("enUS"), "en_US");
+        assert_eq!(locale_tag("deDE"), "de_DE");
+        assert_eq!(locale_tag("xx"), "xx");
     }
 }
