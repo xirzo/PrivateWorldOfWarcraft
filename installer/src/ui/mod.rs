@@ -86,6 +86,7 @@ pub struct InstallInput {
     pub locales: Vec<String>,
     pub source_mode: SourceMode,
     pub zip_path: Option<PathBuf>,
+    pub reinstall_patches: bool,
     pub cancel: Arc<AtomicBool>,
 }
 
@@ -124,9 +125,8 @@ pub struct App {
     pub cancel: Arc<AtomicBool>,
     pub view: ProgressView,
     pub logs: Vec<String>,
-    pub add_to_steam: bool,
-    pub steam_status: Option<String>,
-    pub just_finished: bool,
+    /// In repair mode, re-download and re-apply the localization patches.
+    pub reinstall_patches: bool,
 }
 
 impl App {
@@ -209,6 +209,9 @@ impl App {
             locales,
             source_mode: self.source_mode,
             zip_path,
+            // Fresh installs always install the patches; a repair only does
+            // so when the user explicitly asks.
+            reinstall_patches: !self.has_existing || self.reinstall_patches,
             cancel: self.cancel.clone(),
         })
     }
@@ -237,49 +240,6 @@ impl App {
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Create a desktop shortcut for the installed game and record the result.
-    pub fn create_desktop_shortcut(&mut self) {
-        let lang = self.lang;
-        if self.dir.trim().is_empty() {
-            self.steam_status = Some(
-                lang.s("Install directory is empty.", "Папка установки пуста.")
-                    .to_string(),
-            );
-            return;
-        }
-        let install_dir = std::path::PathBuf::from(self.dir.trim());
-        let exe = install_dir.join(crate::core::client::WOW_EXE);
-        if !exe.exists() {
-            self.steam_status = Some(
-                lang.s(
-                    "Game executable not found yet.",
-                    "Игровой файл ещё не найден.",
-                )
-                .to_string(),
-            );
-            return;
-        }
-        match crate::steam::create_desktop_shortcut(&install_dir, &exe) {
-            Ok(path) => {
-                let msg = format!(
-                    "{} {}",
-                    lang.s("Shortcut created:", "Ярлык создан:"),
-                    path.display()
-                );
-                crate::logging::log(&msg);
-                self.steam_status = Some(msg);
-            }
-            Err(e) => {
-                let msg = format!(
-                    "{} {e}",
-                    lang.s("Failed to create shortcut:", "Не удалось создать ярлык:")
-                );
-                crate::logging::log(&msg);
-                self.steam_status = Some(msg);
-            }
-        }
-    }
-
     pub fn poll_worker(&mut self) {
         let mut finished: Option<Result<()>> = None;
         if let Some(worker) = self.worker.take() {
@@ -305,7 +265,6 @@ impl App {
                 Ok(()) => {
                     self.view.completed = true;
                     self.screen = Screen::Finish;
-                    self.just_finished = true;
                     // Persist settings for next run.
                     self.cfg.install_dir = Some(self.dir.trim().into());
                     if let Ok(s) = self.current_server() {
@@ -521,6 +480,7 @@ fn worker_main(input: InstallInput, tx: std::sync::mpsc::Sender<WorkerEvent>) {
                 locales: &input.locales,
                 cancel,
                 temp_dir: &temp_dir,
+                reinstall_patches: input.reinstall_patches,
             },
             &|e| emit(WorkerEvent::Flow(e.clone())),
         )?;

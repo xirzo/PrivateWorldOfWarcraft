@@ -53,6 +53,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         });
 
         ui.add_space(16.0);
+        if app.has_existing {
+            ui.checkbox(
+                &mut app.reinstall_patches,
+                lang.s(
+                    "Reinstall language packs (re-download patches)",
+                    "Переустановить языковые пакеты (скачать заново)",
+                ),
+            );
+            ui.weak(
+                lang.s(
+                    "Turn on to re-download and re-apply the language patches. Leave off to only re-set the server and locale.",
+                    "Включите, чтобы скачать и применить языковые пакеты заново. Выключено — только повторно настроить сервер и язык.",
+                ),
+            );
+            ui.add_space(16.0);
+        }
         if let Some(err) = &app.view.error {
             ui.colored_label(egui::Color32::from_rgb(200, 80, 80), err);
         }

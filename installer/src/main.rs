@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod core;
 mod engine;
 mod error;
@@ -56,6 +58,10 @@ struct Cli {
     /// Client source: path to a client zip, or a magnet: URI.
     #[arg(long)]
     client: Option<String>,
+
+    /// On an existing install, re-download and re-apply localization patches.
+    #[arg(long)]
+    reinstall_patches: bool,
 
     /// Do not prompt (currently all CLI steps are non-interactive).
     #[arg(long)]
@@ -256,6 +262,11 @@ fn run_cli(cli: Cli) -> Result<()> {
             locales: &cfg.locales,
             cancel: &cancel,
             temp_dir: &temp_dir,
+            reinstall_patches: if already_installed {
+                cli.reinstall_patches
+            } else {
+                true
+            },
         },
         on_flow.as_ref(),
     )?;

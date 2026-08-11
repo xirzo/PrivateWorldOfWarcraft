@@ -9,25 +9,12 @@ use crate::error::{Error, Result};
 pub const CONFIG_FILE_NAME: &str = "wow_installer.toml";
 
 /// Settings persisted between runs (last install dir, chosen server, ...).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AppConfig {
     pub install_dir: Option<PathBuf>,
     pub server: Server,
     #[serde(default)]
     pub locales: Vec<String>,
-    #[serde(default)]
-    pub add_to_steam: bool,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        AppConfig {
-            install_dir: None,
-            server: Server::default(),
-            locales: Vec::new(),
-            add_to_steam: true,
-        }
-    }
 }
 
 impl AppConfig {

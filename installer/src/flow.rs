@@ -37,6 +37,9 @@ pub struct ApplyConfig<'a> {
     pub locales: &'a [String],
     pub cancel: &'a AtomicBool,
     pub temp_dir: &'a Path,
+    /// Download and merge the localization patches. False on a plain
+    /// repair/reconfigure where the patches are already in place.
+    pub reinstall_patches: bool,
 }
 
 /// Apply server + localization configuration to an existing client.
@@ -67,7 +70,9 @@ pub fn apply_config(opts: ApplyConfig<'_>, on: &FlowCallback<'_>) -> Result<()> 
             .cloned()
             .ok_or_else(|| Error::InvalidLocale(id.clone()))?;
 
-        if let Some(url) = &spec.url {
+        if let Some(url) = &spec.url
+            && opts.reinstall_patches
+        {
             let patch = opts.temp_dir.join(format!("{id}.zip"));
             on(&FlowEvent::DownloadLocale {
                 locale: id.clone(),
