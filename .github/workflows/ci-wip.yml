@@ -49,6 +49,13 @@ jobs:
       - name: Headless smoke test
         run: ./installer/target/debug/wow_installer --version
 
+      - name: Upload debug build
+        uses: actions/upload-artifact@v4
+        with:
+          name: wow_installer-debug-linux-x86_64
+          path: installer/target/debug/wow_installer
+          if-no-files-found: error
+
   windows:
     name: debug build (crt-static)
     runs-on: windows-latest
@@ -75,3 +82,10 @@ jobs:
 
       - name: Headless smoke test
         run: .\installer\target\x86_64-pc-windows-msvc\debug\wow_installer.exe --version
+
+      - name: Upload debug build
+        uses: actions/upload-artifact@v4
+        with:
+          name: wow_installer-debug-windows-x86_64
+          path: installer/target/x86_64-pc-windows-msvc/debug/wow_installer.exe
+          if-no-files-found: error
