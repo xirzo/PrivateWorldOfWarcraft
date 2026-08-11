@@ -1,0 +1,77 @@
+name: CI (wip)
+
+# Fast debug builds for work-in-progress branches. No LTO/release profile, and
+# cargo output is cached so repeated pushes only recompile what changed.
+on:
+  push:
+    branches:
+      - 'wip/**'
+  workflow_dispatch:
+
+concurrency:
+  group: wip-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: fmt + clippy + tests + debug build (glibc)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            installer/target
+          key: wip-linux-${{ hashFiles('installer/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path installer/Cargo.toml --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path installer/Cargo.toml --features gui -- -D warnings
+
+      - name: Run tests
+        run: cargo test --manifest-path installer/Cargo.toml --features gui
+
+      - name: Build (debug, glibc)
+        run: cargo build --manifest-path installer/Cargo.toml
+
+      - name: Headless smoke test
+        run: ./installer/target/debug/wow_installer --version
+
+  windows:
+    name: debug build (crt-static)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            installer/target
+          key: wip-win-${{ hashFiles('installer/Cargo.lock') }}
+
+      - name: Build (debug, crt-static)
+        run: cargo build --manifest-path installer/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Headless smoke test
+        run: .\installer\target\x86_64-pc-windows-msvc\debug\wow_installer.exe --version
