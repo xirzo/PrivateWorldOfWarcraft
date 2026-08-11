@@ -324,11 +324,22 @@ impl App {
                 self.view.fraction = e.fraction();
                 self.view.speed_bps = *speed_bps;
                 self.view.peers = *peers;
-                self.view.detail = format!(
-                    "{} / {}",
-                    crate::app::human_bytes(*downloaded),
-                    total_bytes.map(crate::app::human_bytes).unwrap_or_default()
-                );
+                self.view.detail = match total_bytes {
+                    Some(total) => format!(
+                        "{} / {}",
+                        crate::app::human_bytes(*downloaded),
+                        crate::app::human_bytes(*total)
+                    ),
+                    // Metadata not resolved yet — still looking for peers.
+                    None if *downloaded == 0 => self
+                        .lang
+                        .s(
+                            "Looking for peers...",
+                            "Поиск пиров — может занять несколько минут...",
+                        )
+                        .to_string(),
+                    None => crate::app::human_bytes(*downloaded),
+                };
             }
             DownloadEvent::Done => {}
         }
@@ -426,66 +437,78 @@ fn worker_main(input: InstallInput, tx: std::sync::mpsc::Sender<WorkerEvent>) {
     let temp_dir = install_dir.join(".wow_installer_temp");
 
     let result = (|| -> Result<()> {
-        let need_client = !crate::core::check::has_wow_executable(install_dir);
+        // A panic here would kill the worker thread and leave the wizard
+        // frozen on the running screen forever; surface it as an error.
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<()> {
+            let need_client = !crate::core::check::has_wow_executable(install_dir);
 
-        if need_client {
-            let zip_path = match input.source_mode {
-                SourceMode::Magnet => {
-                    emit(WorkerEvent::Log(
-                        "Downloading client via BitTorrent...".to_string(),
-                    ));
-                    let magnet = crate::core::client::CLIENT_MAGNET;
-                    crate::engine::torrent::download_torrent(
-                        crate::engine::torrent::TorrentOptions {
-                            magnet,
-                            save_dir: &temp_dir,
-                            cancel,
-                            on_progress: &|e| emit(WorkerEvent::Download(e)),
-                        },
-                    )?
-                }
-                SourceMode::Zip => {
-                    let path = input.zip_path.clone().ok_or_else(|| {
-                        crate::error::Error::Msg("no client archive selected".to_string())
-                    })?;
-                    if !path.exists() {
-                        return Err(crate::error::Error::NotFound(path));
+            if need_client {
+                let zip_path = match input.source_mode {
+                    SourceMode::Magnet => {
+                        emit(WorkerEvent::Log(
+                            "Downloading client via BitTorrent...".to_string(),
+                        ));
+                        let magnet = crate::core::client::CLIENT_MAGNET;
+                        crate::engine::torrent::download_torrent(
+                            crate::engine::torrent::TorrentOptions {
+                                magnet,
+                                save_dir: &temp_dir,
+                                cancel,
+                                on_progress: &|e| emit(WorkerEvent::Download(e)),
+                            },
+                        )?
                     }
-                    path
-                }
-            };
+                    SourceMode::Zip => {
+                        let path = input.zip_path.clone().ok_or_else(|| {
+                            crate::error::Error::Msg("no client archive selected".to_string())
+                        })?;
+                        if !path.exists() {
+                            return Err(crate::error::Error::NotFound(path));
+                        }
+                        path
+                    }
+                };
 
-            emit(WorkerEvent::Log("Extracting client...".to_string()));
-            crate::flow::install_client(
-                crate::flow::InstallClient {
-                    zip_path: &zip_path,
-                    install_dir,
-                    cancel,
-                },
-                &mut |p: &ExtractProgress| emit(WorkerEvent::Extract(p.clone())),
-            )?;
-        } else {
+                emit(WorkerEvent::Log("Extracting client...".to_string()));
+                crate::flow::install_client(
+                    crate::flow::InstallClient {
+                        zip_path: &zip_path,
+                        install_dir,
+                        cancel,
+                    },
+                    &mut |p: &ExtractProgress| emit(WorkerEvent::Extract(p.clone())),
+                )?;
+            } else {
+                emit(WorkerEvent::Log(
+                    "Existing client detected — applying configuration only.".to_string(),
+                ));
+            }
+
             emit(WorkerEvent::Log(
-                "Existing client detected — applying configuration only.".to_string(),
+                "Configuring server and locales...".to_string(),
             ));
-        }
+            crate::flow::apply_config(
+                crate::flow::ApplyConfig {
+                    install_dir,
+                    server: &input.server,
+                    locales: &input.locales,
+                    cancel,
+                    temp_dir: &temp_dir,
+                    reinstall_patches: input.reinstall_patches,
+                },
+                &|e| emit(WorkerEvent::Flow(e.clone())),
+            )?;
 
-        emit(WorkerEvent::Log(
-            "Configuring server and locales...".to_string(),
-        ));
-        crate::flow::apply_config(
-            crate::flow::ApplyConfig {
-                install_dir,
-                server: &input.server,
-                locales: &input.locales,
-                cancel,
-                temp_dir: &temp_dir,
-                reinstall_patches: input.reinstall_patches,
-            },
-            &|e| emit(WorkerEvent::Flow(e.clone())),
-        )?;
-
-        Ok(())
+            Ok(())
+        }))
+        .unwrap_or_else(|payload| {
+            let msg = payload
+                .downcast_ref::<&str>()
+                .map(|s| (*s).to_string())
+                .or_else(|| payload.downcast_ref::<String>().cloned())
+                .unwrap_or_else(|| "unknown internal error".to_string());
+            Err(crate::error::Error::Msg(format!("internal error: {msg}")))
+        })
     })();
 
     crate::flow::cleanup_temp(&temp_dir);

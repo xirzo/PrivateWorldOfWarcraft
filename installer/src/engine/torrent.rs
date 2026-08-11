@@ -4,7 +4,17 @@ use std::time::Duration;
 
 use crate::engine::events::{DownloadEvent, ProgressCallback};
 use crate::error::{Error, Result};
-use librqbit::{AddTorrent, AddTorrentOptions, Session};
+use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions};
+
+/// How long to keep trying to resolve torrent metadata (name/size) before
+/// giving up. Metadata needs outbound peer/tracker traffic; on networks that
+/// block BitTorrent this never succeeds, and rqbit's peer stream never ends on
+/// its own, so without a timeout the wizard would hang on "Downloading…".
+const METADATA_TIMEOUT: Duration = Duration::from_secs(120);
+/// How often to report "still connecting" while metadata is resolving.
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(2);
+/// How long the initial file-integrity check may take after metadata arrives.
+const INIT_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub struct TorrentOptions<'a> {
     pub magnet: &'a str,
@@ -37,33 +47,28 @@ async fn download_torrent_async(opts: TorrentOptions<'_>) -> Result<PathBuf> {
     on_progress(DownloadEvent::Connecting);
     std::fs::create_dir_all(save_dir)?;
 
-    let session = Session::new(save_dir.to_path_buf())
-        .await
-        .map_err(|e| Error::Msg(format!("failed to create torrent session: {e}")))?;
+    // Listen on a TCP port so peers can connect to us (not just outbound).
+    let session = Session::new_with_opts(
+        save_dir.to_path_buf(),
+        SessionOptions {
+            listen_port_range: Some(6881..6890),
+            enable_upnp_port_forwarding: true,
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(|e| Error::Msg(format!("failed to create torrent session: {e}")))?;
 
-    let handle = match session
-        .add_torrent(
-            AddTorrent::from_url(magnet),
-            Some(AddTorrentOptions {
-                overwrite: true,
-                ..Default::default()
-            }),
-        )
-        .await
-    {
-        Ok(resp) => resp.into_handle().ok_or_else(|| {
-            Error::Msg("torrent session added the torrent in list-only mode".to_string())
-        })?,
-        Err(e) => {
-            session.stop().await;
-            return Err(Error::Msg(format!("failed to add torrent: {e}")));
-        }
-    };
+    // Resolving magnet metadata can take a while (DHT bootstrap, tracker
+    // round-trips) or never finish when outbound peer traffic is blocked.
+    // Report heartbeats while we wait and bail with a clear error on timeout
+    // instead of hanging the wizard forever.
+    let handle = add_torrent_with_progress(&session, magnet, cancel, on_progress).await?;
 
-    // Wait for metadata so we can report the file name and total size.
-    handle
-        .wait_until_initialized()
+    // Wait for the initial file-integrity check with a generous timeout.
+    tokio::time::timeout(INIT_TIMEOUT, handle.wait_until_initialized())
         .await
+        .map_err(|_| Error::Msg("torrent metadata resolved but the client file check timed out".to_string()))?
         .map_err(|e| Error::Msg(format!("failed to fetch torrent metadata: {e}")))?;
 
     let name = handle.name().unwrap_or_else(|| "client".to_string());
@@ -128,4 +133,71 @@ async fn download_torrent_async(opts: TorrentOptions<'_>) -> Result<PathBuf> {
 
     on_progress(DownloadEvent::Done);
     Ok(path)
+}
+
+/// Add a magnet torrent to the session and wait for its metadata to resolve.
+///
+/// While metadata is pending, reports periodic heartbeat progress events and
+/// checks the cancel flag. On timeout, stops the session and returns a
+/// descriptive error instead of blocking forever.
+async fn add_torrent_with_progress(
+    session: &Session,
+    magnet: &str,
+    cancel: &AtomicBool,
+    on_progress: &ProgressCallback<'_>,
+) -> Result<librqbit::ManagedTorrent> {
+    let add = session.add_torrent(
+        AddTorrent::from_url(magnet),
+        Some(AddTorrentOptions {
+            overwrite: true,
+            ..Default::default()
+        }),
+    );
+    let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    tokio::pin!(add);
+
+    loop {
+        tokio::select! {
+            resp = &mut add => {
+                match resp {
+                    Ok(r) => match r.into_handle() {
+                        Some(handle) => return Ok(handle),
+                        None => {
+                            session.stop().await;
+                            return Err(Error::Msg(
+                                "torrent session added the torrent in list-only mode".to_string(),
+                            ));
+                        }
+                    },
+                    Err(e) => {
+                        session.stop().await;
+                        return Err(Error::Msg(format!("failed to add torrent: {e}")));
+                    }
+                }
+            }
+            _ = tokio::time::sleep(METADATA_TIMEOUT) => {
+                session.stop().await;
+                return Err(Error::Msg(
+                    "could not fetch torrent metadata (no peers/trackers reachable). \
+                     BitTorrent traffic may be blocked by the network, Windows Firewall \
+                     or antivirus. Allow outbound connections on ports 6881-6890, then \
+                     try again."
+                        .to_string(),
+                ));
+            }
+            _ = heartbeat.tick() => {
+                if cancel.load(Ordering::Relaxed) {
+                    session.stop().await;
+                    return Err(Error::Cancelled);
+                }
+                on_progress(DownloadEvent::Progress {
+                    downloaded: 0,
+                    total_bytes: None,
+                    speed_bps: 0,
+                    peers: Some(0),
+                });
+            }
+        }
+    }
 }
